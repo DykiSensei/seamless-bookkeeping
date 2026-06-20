@@ -1,20 +1,25 @@
 package com.bookkeeping.app.ui.screen.transactions
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,25 +42,23 @@ import com.bookkeeping.app.data.local.entity.TransactionCategory
 import com.bookkeeping.app.data.local.entity.TransactionEntity
 import com.bookkeeping.app.data.local.entity.TransactionType
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// 账单列表主屏幕
-// hiltViewModel() = 让 Hilt 自动创建/复用同一份 ViewModel 实例
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListScreen(
     viewModel: TransactionViewModel = hiltViewModel()
 ) {
-    val transactions by viewModel.transactions.collectAsState()
+    val transactions by viewModel.displayedTransactions.collectAsState()
     val monthlyExpense by viewModel.monthlyExpenseCents.collectAsState()
     val monthlyIncome by viewModel.monthlyIncomeCents.collectAsState()
+    val selectedCategory by viewModel.categoryFilter.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("无感记账") })
-        },
+        topBar = { TopAppBar(title = { Text("无感记账") }) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "新建账单")
@@ -67,27 +70,26 @@ fun TransactionListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 顶部统计卡片
+            // 顶部统计卡片（基于全月数据，不受 filter 影响）
             MonthlySummaryCard(
                 monthlyExpenseCents = monthlyExpense,
                 monthlyIncomeCents = monthlyIncome,
             )
 
+            // 分类筛选 chip 行
+            CategoryFilterRow(
+                selected = selectedCategory,
+                onSelect = viewModel::setCategoryFilter,
+            )
+
             if (transactions.isEmpty()) {
-                EmptyState()
+                EmptyState(filterActive = selectedCategory != null)
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(transactions, key = { it.id }) { tx ->
-                        TransactionItem(
-                            transaction = tx,
-                            onDelete = { viewModel.delete(tx) }
-                        )
-                    }
-                }
+                // 按日期分组渲染
+                GroupedTransactionList(
+                    transactions = transactions,
+                    onDelete = viewModel::delete,
+                )
             }
         }
     }
@@ -112,13 +114,12 @@ private fun MonthlySummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // 主数字：结余（醒目）
             Text(
                 text = "本月结余",
                 style = MaterialTheme.typography.labelLarge,
@@ -130,7 +131,6 @@ private fun MonthlySummaryCard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
-            // 副数字：收入 + 支出 两栏并列
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -177,6 +177,98 @@ private fun SummaryStat(
 }
 
 @Composable
+private fun CategoryFilterRow(
+    selected: TransactionCategory?,
+    onSelect: (TransactionCategory?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text("全部") }
+        )
+        TransactionCategory.entries.forEach { cat ->
+            FilterChip(
+                selected = selected == cat,
+                onClick = { onSelect(if (selected == cat) null else cat) },
+                label = { Text(cat.displayName) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupedTransactionList(
+    transactions: List<TransactionEntity>,
+    onDelete: (TransactionEntity) -> Unit,
+) {
+    // 按 dayKey 分组（同一天 = 同一组）。LinkedHashMap 保留插入顺序（即时间倒序）
+    val groups = remember(transactions) {
+        transactions.groupBy { dayKey(it.timestamp) }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        groups.forEach { (dayKey, dayItems) ->
+            // 每组的头部：日期 + 当日合计
+            item(key = "header_$dayKey") {
+                DayHeader(dayKey = dayKey, items = dayItems)
+            }
+            // 该组内的交易项
+            items(dayItems, key = { it.id }) { tx ->
+                TransactionItem(transaction = tx, onDelete = { onDelete(tx) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayHeader(dayKey: String, items: List<TransactionEntity>) {
+    val expense = items.filter { it.type == TransactionType.EXPENSE.name }.sumOf { it.amountCents }
+    val income = items.filter { it.type == TransactionType.INCOME.name }.sumOf { it.amountCents }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = dayLabel(dayKey),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (income > 0) {
+            Text(
+                text = "+¥${"%.2f".format(income / 100.0)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+        }
+        if (expense > 0) {
+            Text(
+                text = "−¥${"%.2f".format(expense / 100.0)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+@Composable
 private fun TransactionItem(
     transaction: TransactionEntity,
     onDelete: () -> Unit,
@@ -184,7 +276,7 @@ private fun TransactionItem(
     val type = runCatching { TransactionType.valueOf(transaction.type) }.getOrDefault(TransactionType.EXPENSE)
     val category = runCatching { TransactionCategory.valueOf(transaction.category) }.getOrDefault(TransactionCategory.OTHER)
     val amount = "%.2f".format(transaction.amountCents / 100.0)
-    val sign = if (type == TransactionType.INCOME) "+" else "-"
+    val sign = if (type == TransactionType.INCOME) "+" else "−"
     val amountColor =
         if (type == TransactionType.INCOME) MaterialTheme.colorScheme.tertiary
         else MaterialTheme.colorScheme.error
@@ -212,7 +304,7 @@ private fun TransactionItem(
                     )
                 }
                 Text(
-                    text = formatTimestamp(transaction.timestamp),
+                    text = timeOnlyFormat.format(Date(transaction.timestamp)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -231,25 +323,47 @@ private fun TransactionItem(
 }
 
 @Composable
-private fun EmptyState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+private fun EmptyState(filterActive: Boolean) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "还没有账单",
+                text = if (filterActive) "该分类下还没有记录" else "还没有账单",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = "点击右下角 + 添加第一笔",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (!filterActive) {
+                Text(
+                    text = "点击右下角 + 添加第一笔",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
-private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-private fun formatTimestamp(ms: Long): String = timeFormat.format(Date(ms))
+// === 时间分组辅助 ===
+
+private val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+private val timeOnlyFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+private val monthDayFormat = SimpleDateFormat("MM月dd日", Locale.getDefault())
+
+// 把毫秒时间戳转成 "yyyy-MM-dd" 字符串作为分组 key
+private fun dayKey(timestampMs: Long): String = dayKeyFormat.format(Date(timestampMs))
+
+// 把 dayKey 转成展示用的标签："今天" / "昨天" / "MM月dd日"
+private fun dayLabel(dayKey: String): String {
+    val today = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }
+    val todayKey = dayKeyFormat.format(today.time)
+    val yesterdayKey = dayKeyFormat.format(Date(today.timeInMillis - 86_400_000L))
+    return when (dayKey) {
+        todayKey -> "今天"
+        yesterdayKey -> "昨天"
+        else -> {
+            // 解析回 Date，然后格式化为 MM月dd日
+            runCatching { monthDayFormat.format(dayKeyFormat.parse(dayKey)!!) }.getOrDefault(dayKey)
+        }
+    }
+}
