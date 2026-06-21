@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -116,56 +115,6 @@ fun TransactionListScreen(
                     onClick = { smsPermissionLauncher.launch(SmsPermissionHelper.REQUIRED_PERMISSIONS) }
                 )
             }
-
-            // DEBUG：模拟通知按钮（基于真实通知格式调研结果）
-            DebugSimulateBar(
-                // 支付宝真实付款通知："付款成功￥3.00 (AB)湖北武汉黄陂汉口北服装城美宜佳"
-                onSimulateAlipayExpense = {
-                    viewModel.simulateNotification(
-                        packageName = "com.eg.android.AlipayGphone",
-                        title = "付款成功",
-                        text = "付款成功￥25.00 星巴克咖啡(中关村店)",
-                    )
-                },
-                // 支付宝真实个人收款通知（v2ex 抓取）
-                onSimulateAlipayIncome = {
-                    viewModel.simulateNotification(
-                        packageName = "com.eg.android.AlipayGphone",
-                        title = "支付宝支付",
-                        text = "成功收款 100.00 元。享免费提现等更多专属服务，点击查看",
-                    )
-                },
-                // 微信主动付款（"向 商户 付款"）
-                onSimulateWeChatExpense = {
-                    viewModel.simulateNotification(
-                        packageName = "com.tencent.mm",
-                        title = "微信支付",
-                        text = "向 麦当劳 付款 12.30 元",
-                    )
-                },
-                // 微信收到转账（"向你付款"是别人付给你 = 收入）
-                onSimulateWeChatIncome = {
-                    viewModel.simulateNotification(
-                        packageName = "com.tencent.mm",
-                        title = "微信支付",
-                        text = "向你付款 50.00 元",
-                    )
-                },
-                // 工商银行信用卡消费短信
-                onSimulateIcbcSms = {
-                    viewModel.simulateSms(
-                        sender = "95588",
-                        body = "【工商银行】您尾号1234的工银信用卡，于06月21日18:30消费人民币88.00元，余额12345.67元",
-                    )
-                },
-                // 招商银行工资到账短信
-                onSimulateCmbSms = {
-                    viewModel.simulateSms(
-                        sender = "95555",
-                        body = "【招商银行】您尾号5678账户06月15日 工资到账人民币 8000.00元，活期余额 12500.00元",
-                    )
-                },
-            )
 
             // 顶部统计卡片（基于全月数据，不受 filter 影响）
             MonthlySummaryCard(
@@ -434,48 +383,6 @@ private fun EmptyState(filterActive: Boolean) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-    }
-}
-
-// DEBUG 模拟通知工具栏。验证 Parser 用，正式发布时应该藏到 BuildConfig.DEBUG 后面。
-@Composable
-private fun DebugSimulateBar(
-    onSimulateAlipayExpense: () -> Unit,
-    onSimulateAlipayIncome: () -> Unit,
-    onSimulateWeChatExpense: () -> Unit,
-    onSimulateWeChatIncome: () -> Unit,
-    onSimulateIcbcSms: () -> Unit,
-    onSimulateCmbSms: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Text(
-                text = "DEBUG · 模拟通知（验证 Parser）",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AssistChip(onClick = onSimulateAlipayExpense, label = { Text("支付宝付款 25") })
-                AssistChip(onClick = onSimulateAlipayIncome, label = { Text("支付宝收款 100") })
-                AssistChip(onClick = onSimulateWeChatExpense, label = { Text("微信付款 12.3") })
-                AssistChip(onClick = onSimulateWeChatIncome, label = { Text("微信收款 50") })
-                AssistChip(onClick = onSimulateIcbcSms, label = { Text("工行短信消费 88") })
-                AssistChip(onClick = onSimulateCmbSms, label = { Text("招行短信工资 8000") })
             }
         }
     }
