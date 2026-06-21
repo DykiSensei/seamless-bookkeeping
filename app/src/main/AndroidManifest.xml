@@ -48,6 +48,28 @@
             </intent-filter>
         </service>
 
+        <!-- 前台保活服务：常驻通知 + 提高 NotificationListener 在国产 ROM 上的存活率 -->
+        <!-- 默认不启动，由用户在「设置」里开启 -->
+        <service
+            android:name=".notification.KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 无障碍兜底服务：抓微信转账/红包、支付宝转账入账等通知抓不到的场景 -->
+        <!-- 默认未启用，用户必须在系统「无障碍」里手动勾选才会生效 -->
+        <service
+            android:name=".notification.accessibility.AccessibilityCaptureService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <!-- 短信广播接收器：抓取银行交易短信 -->
         <!-- SMS_RECEIVED 是允许的"豁免隐式广播"，可以静态注册 -->
         <receiver

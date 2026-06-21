@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  无障碍服务配置：
+  - 仅监听支付宝、微信两个包名（最小权限）
+  - 只关心窗口状态变化 + 窗口内容变化（足够覆盖转账/红包页面切换 + 金额节点更新）
+  - 不需要按键事件、不需要手势注入、不需要查看密码字段
+  - isAccessibilityTool="true": 声明这是无障碍工具，Android 13+ 必填，规避被识别为滥用
+  - canRetrieveWindowContent: 必须 true，要读 UI 节点树
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:isAccessibilityTool="true"
+    android:notificationTimeout="200"
+    android:packageNames="com.eg.android.AlipayGphone,com.tencent.mm" />

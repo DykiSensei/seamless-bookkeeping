@@ -45,9 +45,10 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         val parsed = SmsParser.parse(sender, fullBody, timestamp) ?: return
 
         scope.launch {
-            val id = repository.insert(parsed)
-            // release 构建里只记录 id，不记录金额/账户等敏感字段
-            if (BuildConfig.DEBUG) {
+            val id = repository.insertIfNotDuplicate(parsed)
+            if (id == null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Skipped duplicate SMS")
+            } else if (BuildConfig.DEBUG) {
                 Log.i(TAG, "Auto-captured bank SMS: id=$id amount=${parsed.amountCents} account=${parsed.account}")
             } else {
                 Log.i(TAG, "Auto-captured bank SMS: id=$id")

@@ -27,6 +27,21 @@ class TransactionRepository @Inject constructor(
 
     suspend fun insert(transaction: TransactionEntity): Long = dao.insert(transaction)
 
+    // 自动抓取路径专用：60s 窗口内同来源同金额视为重复，跳过入库。
+    // 返回 null 表示重复，返回 Long 表示新插入的 id。
+    suspend fun insertIfNotDuplicate(
+        transaction: TransactionEntity,
+        windowMs: Long = 60_000L,
+    ): Long? {
+        val existing = dao.findRecentSameAmount(
+            source = transaction.source,
+            amountCents = transaction.amountCents,
+            windowStartMs = transaction.timestamp - windowMs,
+            windowEndMs = transaction.timestamp + windowMs,
+        )
+        return if (existing != null) null else dao.insert(transaction)
+    }
+
     suspend fun update(transaction: TransactionEntity) = dao.update(transaction)
 
     suspend fun delete(transaction: TransactionEntity) = dao.delete(transaction)

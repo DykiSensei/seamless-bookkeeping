@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">BookkeepingApp</string>
+    <string name="accessibility_service_description">
+        用于自动识别微信转账/红包、支付宝转账入账等通知无法覆盖的收款场景。
+        本服务只在微信、支付宝两个 app 内激活，不会读取其他应用，
+        所有金额信息仅保存在本机数据库，绝不上传任何服务器。
+    </string>
 </resources>

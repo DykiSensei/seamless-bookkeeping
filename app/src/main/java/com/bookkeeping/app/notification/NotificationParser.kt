@@ -7,16 +7,19 @@ import com.bookkeeping.app.data.local.entity.TransactionType
 
 // 解析支付宝 / 微信通知文本，提取金额、收支方向、商户名。
 //
-// 真实通知样本（调研自 v2ex / AutoAccountingOrg issues / CFANZ）：
+// 真实通知样本（调研自 v2ex / AutoAccountingOrg issues / CFANZ + 用户实测）：
 //   - 支付宝个人收款：  title="支付宝支付"   text="成功收款 1.00 元。享免费提现等更多专属服务..."
 //   - 支付宝付款成功：  title="付款成功"    text="付款成功￥3.00 (AB)湖北武汉黄陂汉口北服装城美宜佳"
+//   - 支付宝通用支出：  text="你有一笔 88.00 元的支出，点此查看详情"
 //   - 支付宝退款：     title="支付宝"     text="收到退款 X.XX 元"
 //   - 微信主动付款：   title="微信支付"   text="向 麦当劳 付款 12.30 元"
 //   - 微信收到转账：   title="微信支付"   text="向你付款 100.00 元"  (别人付给你)
 //   - 微信收转账：     text="收到 张三 的转账 100.00 元"
 //
-// ⚠️ 局限性：微信扫码收款从 2020 后不再发系统通知（改 app 内提示），本 Parser 无法覆盖该场景。
-// 若想抓扫码收款，需要 AccessibilityService。详见 memory/project_notification_quirks。
+// ⚠️ 局限 1：微信扫码收款从 2020 后不再发系统通知（改 app 内提示）。
+// ⚠️ 局限 2：支付宝转账入账（"某某给你转了一笔钱，点击查看详细信息"）通知文本不含金额，
+//            extractAmount 会返回 null，整条通知被丢弃。
+// 两个场景都需要 AccessibilityService 兜底（task #11）。
 object NotificationParser {
 
     private const val PKG_ALIPAY = "com.eg.android.AlipayGphone"
@@ -42,6 +45,7 @@ object NotificationParser {
         "支付成功", "已支付", "您已支付",
         "扣款", "扣费", "已扣款",
         "消费",
+        "支出", "的支出",  // 支付宝："你有一笔 X 元的支出"
     )
 
     // "向 商户名 付款" 模式（区分于"向你/您 付款"）= 支出

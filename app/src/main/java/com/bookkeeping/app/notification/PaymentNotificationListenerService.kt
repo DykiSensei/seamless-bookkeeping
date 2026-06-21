@@ -56,13 +56,14 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             timestampMs = sbn.postTime,
         ) ?: return
 
-        // 在后台协程里入库（IO 不能在主线程）
+        // 在后台协程里入库（IO 不能在主线程）。
+        // insertIfNotDuplicate：60s 内同来源同金额视为重复，跳过。覆盖
+        // "通知/SMS/无障碍可能抓到同一笔" 的场景。
         scope.launch {
-            // 去重：60 秒内同来源同金额的当作重复，跳过
-            // 简化做法：直接 insert。后续可加重复检测。
-            val id = repository.insert(parsed)
-            // release 构建里只记录 id，不记录金额/来源等敏感字段
-            if (BuildConfig.DEBUG) {
+            val id = repository.insertIfNotDuplicate(parsed)
+            if (id == null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Skipped duplicate notification")
+            } else if (BuildConfig.DEBUG) {
                 Log.i(TAG, "Auto-captured transaction id=$id amount=${parsed.amountCents} source=${parsed.source}")
             } else {
                 Log.i(TAG, "Auto-captured transaction id=$id")

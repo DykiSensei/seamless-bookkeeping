@@ -45,4 +45,19 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getById(id: Long): TransactionEntity?
+
+    // 用于自动抓取路径去重：在时间窗口内找同来源 + 同金额的记录。
+    // 命中即认为是重复（同一笔交易被通知/无障碍/SMS 多个通道抓到了）。
+    @Query("""
+        SELECT * FROM transactions
+        WHERE source = :source AND amountCents = :amountCents
+          AND timestamp >= :windowStartMs AND timestamp <= :windowEndMs
+        LIMIT 1
+    """)
+    suspend fun findRecentSameAmount(
+        source: String,
+        amountCents: Long,
+        windowStartMs: Long,
+        windowEndMs: Long,
+    ): TransactionEntity?
 }
