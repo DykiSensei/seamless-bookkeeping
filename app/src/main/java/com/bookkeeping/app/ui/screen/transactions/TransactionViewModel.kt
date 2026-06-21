@@ -8,6 +8,7 @@ import com.bookkeeping.app.data.local.entity.TransactionSource
 import com.bookkeeping.app.data.local.entity.TransactionType
 import com.bookkeeping.app.data.repository.TransactionRepository
 import com.bookkeeping.app.notification.NotificationParser
+import com.bookkeeping.app.notification.SmsParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -88,6 +89,16 @@ class TransactionViewModel @Inject constructor(
             packageName = packageName,
             title = title,
             text = text,
+            timestampMs = System.currentTimeMillis(),
+        ) ?: return
+        viewModelScope.launch { repository.insert(parsed) }
+    }
+
+    // DEBUG ONLY：模拟收到一条银行短信
+    fun simulateSms(sender: String, body: String) {
+        val parsed = SmsParser.parse(
+            sender = sender,
+            body = body,
             timestampMs = System.currentTimeMillis(),
         ) ?: return
         viewModelScope.launch { repository.insert(parsed) }

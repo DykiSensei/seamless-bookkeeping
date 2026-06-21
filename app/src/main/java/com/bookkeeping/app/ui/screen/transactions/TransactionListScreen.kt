@@ -38,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -48,6 +50,7 @@ import com.bookkeeping.app.data.local.entity.TransactionCategory
 import com.bookkeeping.app.data.local.entity.TransactionEntity
 import com.bookkeeping.app.data.local.entity.TransactionType
 import com.bookkeeping.app.notification.NotificationListenerHelper
+import com.bookkeeping.app.notification.SmsPermissionHelper
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -64,18 +67,27 @@ fun TransactionListScreen(
     val selectedCategory by viewModel.categoryFilter.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // 监听 Activity 生命周期：每次回到前台时重新检查通知监听权限状态
+    // 监听 Activity 生命周期：每次回到前台时重新检查两类权限状态
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var notificationListenerEnabled by remember { mutableStateOf(NotificationListenerHelper.isEnabled(context)) }
+    var smsPermissionGranted by remember { mutableStateOf(SmsPermissionHelper.isGranted(context)) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 notificationListenerEnabled = NotificationListenerHelper.isEnabled(context)
+                smsPermissionGranted = SmsPermissionHelper.isGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // SMS 权限请求 launcher
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        smsPermissionGranted = results.values.all { it }
     }
 
     Scaffold(
@@ -95,6 +107,13 @@ fun TransactionListScreen(
             if (!notificationListenerEnabled) {
                 NotificationPermissionBanner(
                     onClick = { NotificationListenerHelper.openSettings(context) }
+                )
+            }
+
+            // SMS 权限未授权时显示提示横幅
+            if (!smsPermissionGranted) {
+                SmsPermissionBanner(
+                    onClick = { smsPermissionLauncher.launch(SmsPermissionHelper.REQUIRED_PERMISSIONS) }
                 )
             }
 
@@ -130,6 +149,20 @@ fun TransactionListScreen(
                         packageName = "com.tencent.mm",
                         title = "微信支付",
                         text = "向你付款 50.00 元",
+                    )
+                },
+                // 工商银行信用卡消费短信
+                onSimulateIcbcSms = {
+                    viewModel.simulateSms(
+                        sender = "95588",
+                        body = "【工商银行】您尾号1234的工银信用卡，于06月21日18:30消费人民币88.00元，余额12345.67元",
+                    )
+                },
+                // 招商银行工资到账短信
+                onSimulateCmbSms = {
+                    viewModel.simulateSms(
+                        sender = "95555",
+                        body = "【招商银行】您尾号5678账户06月15日 工资到账人民币 8000.00元，活期余额 12500.00元",
                     )
                 },
             )
@@ -413,6 +446,8 @@ private fun DebugSimulateBar(
     onSimulateAlipayIncome: () -> Unit,
     onSimulateWeChatExpense: () -> Unit,
     onSimulateWeChatIncome: () -> Unit,
+    onSimulateIcbcSms: () -> Unit,
+    onSimulateCmbSms: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -439,6 +474,8 @@ private fun DebugSimulateBar(
                 AssistChip(onClick = onSimulateAlipayIncome, label = { Text("支付宝收款 100") })
                 AssistChip(onClick = onSimulateWeChatExpense, label = { Text("微信付款 12.3") })
                 AssistChip(onClick = onSimulateWeChatIncome, label = { Text("微信收款 50") })
+                AssistChip(onClick = onSimulateIcbcSms, label = { Text("工行短信消费 88") })
+                AssistChip(onClick = onSimulateCmbSms, label = { Text("招行短信工资 8000") })
             }
         }
     }
@@ -446,10 +483,28 @@ private fun DebugSimulateBar(
 
 @Composable
 private fun NotificationPermissionBanner(onClick: () -> Unit) {
+    PermissionBanner(
+        title = "未开启通知监听",
+        body = "点击此处开启「通知使用权」，App 才能自动抓取支付宝 / 微信付款记录",
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SmsPermissionBanner(onClick: () -> Unit) {
+    PermissionBanner(
+        title = "未开启短信权限",
+        body = "点击此处授予短信权限，App 才能自动抓取银行交易短信",
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun PermissionBanner(title: String, body: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer
         ),
@@ -457,13 +512,13 @@ private fun NotificationPermissionBanner(onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "未开启通知监听",
+                text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Text(
-                text = "点击此处开启「通知使用权」，App 才能自动抓取支付宝 / 微信付款记录",
+                text = body,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )

@@ -47,6 +47,17 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- 短信广播接收器：抓取银行交易短信 -->
+        <!-- SMS_RECEIVED 是允许的"豁免隐式广播"，可以静态注册 -->
+        <receiver
+            android:name=".notification.SmsBroadcastReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
