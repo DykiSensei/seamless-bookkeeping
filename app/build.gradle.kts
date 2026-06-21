@@ -34,6 +34,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // 启用 BuildConfig.DEBUG 用于日志门控
     }
 }
 

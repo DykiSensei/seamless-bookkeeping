@@ -1,13 +1,15 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto-Backup 规则。
+  排除所有财务敏感数据，避免被自动同步到 Google Drive（违反 README 的本地存储承诺）。
+  保留默认行为允许其他无害文件备份（无）。
+  适用于 API < 31。API 31+ 使用 data_extraction_rules.xml。
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- 排除 Room 数据库（包含全部交易记录） -->
+    <exclude domain="database" path="bookkeeping.db" />
+    <exclude domain="database" path="bookkeeping.db-shm" />
+    <exclude domain="database" path="bookkeeping.db-wal" />
+    <!-- 排除 DataStore Preferences（预算设置） -->
+    <exclude domain="file" path="datastore/" />
 </full-backup-content>

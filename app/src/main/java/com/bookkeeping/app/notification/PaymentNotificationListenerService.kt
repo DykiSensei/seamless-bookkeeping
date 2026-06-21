@@ -3,6 +3,7 @@ package com.bookkeeping.app.notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.bookkeeping.app.BuildConfig
 import com.bookkeeping.app.data.repository.TransactionRepository
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
@@ -28,7 +29,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             NotificationListenerEntryPoint::class.java
         )
         repository = entryPoint.transactionRepository()
-        Log.d(TAG, "Service created")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Service created")
     }
 
     override fun onDestroy() {
@@ -43,7 +44,10 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val title = extras.getCharSequence("android.title")?.toString()
         val text = extras.getCharSequence("android.text")?.toString()
 
-        Log.d(TAG, "Notification from $packageName: title=$title text=$text")
+        // 不在 release 构建中记录通知内容（含 PII：金额/商户/付款方式）
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Notification from $packageName: title=$title text=$text")
+        }
 
         val parsed = NotificationParser.parse(
             packageName = packageName,
@@ -57,7 +61,12 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             // 去重：60 秒内同来源同金额的当作重复，跳过
             // 简化做法：直接 insert。后续可加重复检测。
             val id = repository.insert(parsed)
-            Log.i(TAG, "Auto-captured transaction id=$id amount=${parsed.amountCents} source=${parsed.source}")
+            // release 构建里只记录 id，不记录金额/来源等敏感字段
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Auto-captured transaction id=$id amount=${parsed.amountCents} source=${parsed.source}")
+            } else {
+                Log.i(TAG, "Auto-captured transaction id=$id")
+            }
         }
     }
 

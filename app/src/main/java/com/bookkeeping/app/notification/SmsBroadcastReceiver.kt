@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.bookkeeping.app.BuildConfig
 import com.bookkeeping.app.data.repository.TransactionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -36,13 +37,21 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         val fullBody = messages.joinToString(separator = "") { it.messageBody ?: "" }
         val timestamp = messages.first().timestampMillis
 
-        Log.d(TAG, "SMS from $sender: $fullBody")
+        // 不在 release 构建中记录短信内容（含 PII：银行/卡尾号/金额）
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "SMS from $sender: $fullBody")
+        }
 
         val parsed = SmsParser.parse(sender, fullBody, timestamp) ?: return
 
         scope.launch {
             val id = repository.insert(parsed)
-            Log.i(TAG, "Auto-captured bank SMS: id=$id amount=${parsed.amountCents} account=${parsed.account}")
+            // release 构建里只记录 id，不记录金额/账户等敏感字段
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Auto-captured bank SMS: id=$id amount=${parsed.amountCents} account=${parsed.account}")
+            } else {
+                Log.i(TAG, "Auto-captured bank SMS: id=$id")
+            }
         }
     }
 
