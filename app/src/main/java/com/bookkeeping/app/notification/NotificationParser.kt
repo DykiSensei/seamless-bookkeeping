@@ -100,13 +100,14 @@ object NotificationParser {
             else -> TransactionType.EXPENSE
         }
 
-        // 3. 提商户名
+        // 3. 提商户名 + 自动分类
         val merchant = extractMerchant(full)
+        val category = CategoryClassifier.classify(merchant, full)
 
         return TransactionEntity(
             amountCents = (amountYuan * 100).toLong(),
             type = type.name,
-            category = TransactionCategory.OTHER.name,
+            category = category.name,
             merchant = merchant,
             note = "[自动抓取] " + full.take(80),
             source = source.name,

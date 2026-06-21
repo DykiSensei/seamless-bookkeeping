@@ -88,10 +88,13 @@ object SmsParser {
         val cardLast4 = CARD_NO_REGEX.find(body)?.groupValues?.get(1).orEmpty()
         val account = if (cardLast4.isNotEmpty()) "$bank ($cardLast4)" else bank
 
+        // 5. 自动分类（基于短信正文：能识别"工资到账"→SALARY、"加油"→TRANSPORT 等）
+        val category = CategoryClassifier.classify(merchant = "", contextText = body)
+
         return TransactionEntity(
             amountCents = (amountYuan * 100).toLong(),
             type = type.name,
-            category = TransactionCategory.OTHER.name,
+            category = category.name,
             merchant = "",
             note = "[银行短信] " + body.take(80),
             source = TransactionSource.BANK_SMS.name,
