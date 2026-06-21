@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.bookkeeping.app.ui.screen.transactions.TransactionListScreen
+import com.bookkeeping.app.ui.navigation.RootNavigation
 import com.bookkeeping.app.ui.theme.BookkeepingAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BookkeepingAppTheme {
-                TransactionListScreen()
+                RootNavigation()
             }
         }
     }
