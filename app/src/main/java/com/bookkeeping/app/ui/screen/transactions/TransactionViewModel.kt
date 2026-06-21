@@ -7,6 +7,7 @@ import com.bookkeeping.app.data.local.entity.TransactionEntity
 import com.bookkeeping.app.data.local.entity.TransactionSource
 import com.bookkeeping.app.data.local.entity.TransactionType
 import com.bookkeeping.app.data.repository.TransactionRepository
+import com.bookkeeping.app.notification.NotificationParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -78,6 +79,18 @@ class TransactionViewModel @Inject constructor(
 
     fun delete(entity: TransactionEntity) {
         viewModelScope.launch { repository.delete(entity) }
+    }
+
+    // DEBUG ONLY：模拟收到一条通知，走 Parser → Repository 这条完整链路。
+    // 用于在模拟器上验证 Parser 解析规则，不依赖真实的 NotificationListenerService。
+    fun simulateNotification(packageName: String, title: String, text: String) {
+        val parsed = NotificationParser.parse(
+            packageName = packageName,
+            title = title,
+            text = text,
+            timestampMs = System.currentTimeMillis(),
+        ) ?: return
+        viewModelScope.launch { repository.insert(parsed) }
     }
 
     private fun currentMonthRange(): Pair<Long, Long> {

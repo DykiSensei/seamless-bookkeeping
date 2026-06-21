@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,10 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.bookkeeping.app.data.local.entity.TransactionCategory
 import com.bookkeeping.app.data.local.entity.TransactionEntity
 import com.bookkeeping.app.data.local.entity.TransactionType
+import com.bookkeeping.app.notification.NotificationListenerHelper
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -57,6 +64,20 @@ fun TransactionListScreen(
     val selectedCategory by viewModel.categoryFilter.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
+    // 监听 Activity 生命周期：每次回到前台时重新检查通知监听权限状态
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var notificationListenerEnabled by remember { mutableStateOf(NotificationListenerHelper.isEnabled(context)) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationListenerEnabled = NotificationListenerHelper.isEnabled(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("无感记账") }) },
         floatingActionButton = {
@@ -70,6 +91,49 @@ fun TransactionListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // 通知监听未授权时显示提示横幅
+            if (!notificationListenerEnabled) {
+                NotificationPermissionBanner(
+                    onClick = { NotificationListenerHelper.openSettings(context) }
+                )
+            }
+
+            // DEBUG：模拟通知按钮（基于真实通知格式调研结果）
+            DebugSimulateBar(
+                // 支付宝真实付款通知："付款成功￥3.00 (AB)湖北武汉黄陂汉口北服装城美宜佳"
+                onSimulateAlipayExpense = {
+                    viewModel.simulateNotification(
+                        packageName = "com.eg.android.AlipayGphone",
+                        title = "付款成功",
+                        text = "付款成功￥25.00 星巴克咖啡(中关村店)",
+                    )
+                },
+                // 支付宝真实个人收款通知（v2ex 抓取）
+                onSimulateAlipayIncome = {
+                    viewModel.simulateNotification(
+                        packageName = "com.eg.android.AlipayGphone",
+                        title = "支付宝支付",
+                        text = "成功收款 100.00 元。享免费提现等更多专属服务，点击查看",
+                    )
+                },
+                // 微信主动付款（"向 商户 付款"）
+                onSimulateWeChatExpense = {
+                    viewModel.simulateNotification(
+                        packageName = "com.tencent.mm",
+                        title = "微信支付",
+                        text = "向 麦当劳 付款 12.30 元",
+                    )
+                },
+                // 微信收到转账（"向你付款"是别人付给你 = 收入）
+                onSimulateWeChatIncome = {
+                    viewModel.simulateNotification(
+                        packageName = "com.tencent.mm",
+                        title = "微信支付",
+                        text = "向你付款 50.00 元",
+                    )
+                },
+            )
+
             // 顶部统计卡片（基于全月数据，不受 filter 影响）
             MonthlySummaryCard(
                 monthlyExpenseCents = monthlyExpense,
@@ -338,6 +402,71 @@ private fun EmptyState(filterActive: Boolean) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+// DEBUG 模拟通知工具栏。验证 Parser 用，正式发布时应该藏到 BuildConfig.DEBUG 后面。
+@Composable
+private fun DebugSimulateBar(
+    onSimulateAlipayExpense: () -> Unit,
+    onSimulateAlipayIncome: () -> Unit,
+    onSimulateWeChatExpense: () -> Unit,
+    onSimulateWeChatIncome: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = "DEBUG · 模拟通知（验证 Parser）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AssistChip(onClick = onSimulateAlipayExpense, label = { Text("支付宝付款 25") })
+                AssistChip(onClick = onSimulateAlipayIncome, label = { Text("支付宝收款 100") })
+                AssistChip(onClick = onSimulateWeChatExpense, label = { Text("微信付款 12.3") })
+                AssistChip(onClick = onSimulateWeChatIncome, label = { Text("微信收款 50") })
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPermissionBanner(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        onClick = onClick,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "未开启通知监听",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = "点击此处开启「通知使用权」，App 才能自动抓取支付宝 / 微信付款记录",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
         }
     }
 }
