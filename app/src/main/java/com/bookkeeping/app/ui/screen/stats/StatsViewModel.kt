@@ -58,6 +58,31 @@ class StatsViewModel @Inject constructor(
         .map { list -> list.sumOf { it.totalCents } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
+    // 本月每日合计（柱状图用）。无交易的日子填 0
+    val dailyTotals: StateFlow<List<DailyTotal>> = run {
+        val (start, end) = currentMonthRange()
+        combine(
+            repository.observeBetween(start, end),
+            _viewingType,
+        ) { transactions, type ->
+            val filtered = transactions.filter { it.type == type.name }
+            val byDay = filtered.groupBy {
+                Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                    .get(Calendar.DAY_OF_MONTH)
+            }
+            // 计算当月最后一天
+            val lastDay = Calendar.getInstance().apply {
+                timeInMillis = start
+            }.getActualMaximum(Calendar.DAY_OF_MONTH)
+            (1..lastDay).map { day ->
+                DailyTotal(
+                    day = day,
+                    totalCents = byDay[day]?.sumOf { it.amountCents } ?: 0L,
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }
+
     fun setViewingType(type: TransactionType) {
         _viewingType.value = type
     }

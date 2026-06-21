@@ -38,6 +38,7 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
     val stats by viewModel.categoryStats.collectAsState()
     val totalCents by viewModel.totalCents.collectAsState()
     val viewingType by viewModel.viewingType.collectAsState()
+    val dailyTotals by viewModel.dailyTotals.collectAsState()
 
     Scaffold(topBar = { TopAppBar(title = { Text("本月统计") }) }) { innerPadding ->
         Column(
@@ -70,11 +71,51 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
             if (stats.isEmpty()) {
                 EmptyStats(type = viewingType)
             } else {
+                val barColor = if (viewingType == TransactionType.INCOME)
+                    MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // 饼图
+                    item(key = "pie_chart") {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "分类占比",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                CategoryPieChart(
+                                    stats = stats,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                    // 日趋势柱状图
+                    item(key = "daily_chart") {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "每日趋势",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                DailyBarChart(
+                                    dailyTotals = dailyTotals,
+                                    barColor = barColor,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                    // 分类明细列表
                     items(stats, key = { it.category.name }) { stat ->
                         CategoryStatRow(stat = stat, viewingType = viewingType)
                     }
