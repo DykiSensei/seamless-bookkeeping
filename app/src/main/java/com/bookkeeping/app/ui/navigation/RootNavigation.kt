@@ -3,6 +3,7 @@ package com.bookkeeping.app.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -19,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.bookkeeping.app.ui.screen.budget.BudgetScreen
 import com.bookkeeping.app.ui.screen.stats.StatsScreen
 import com.bookkeeping.app.ui.screen.transactions.TransactionListScreen
 
@@ -58,6 +60,7 @@ fun RootNavigation() {
         ) {
             composable(BottomNavItem.Transactions.route) { TransactionListScreen() }
             composable(BottomNavItem.Stats.route) { StatsScreen() }
+            composable(BottomNavItem.Budget.route) { BudgetScreen() }
         }
     }
 }
@@ -65,8 +68,9 @@ fun RootNavigation() {
 private sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     data object Transactions : BottomNavItem("transactions", "账单", Icons.AutoMirrored.Filled.List)
     data object Stats : BottomNavItem("stats", "统计", Icons.Filled.PieChart)
+    data object Budget : BottomNavItem("budget", "预算", Icons.Filled.AccountBalanceWallet)
 
     companion object {
-        val ALL = listOf(Transactions, Stats)
+        val ALL = listOf(Transactions, Stats, Budget)
     }
 }
